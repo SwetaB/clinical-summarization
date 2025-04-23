@@ -1,0 +1,39 @@
+# Core Libraries
+pandas
+numpy
+tqdm
+scikit-learn
+
+# PubMed API
+pymed
+
+# Sentence Embeddings
+sentence-transformers
+faiss-cpu  # or faiss-gpu if you have CUDA
+
+# LangChain + LLM APIs
+langchain
+openai
+tiktoken
+
+# LLM Fine-tuning & Tokenization
+transformers
+datasets
+accelerate
+peft  # for LoRA / QLoRA
+bitsandbytes  # for 8-bit quantization
+optimum  # Hugging Face model optimization
+
+# Optional: ONNX Runtime
+onnxruntime
+optimum[onnxruntime]
+
+# FastAPI Interface (Optional)
+fastapi
+uvicorn
+
+# Other utilities
+torch  # manually choose torch version compatible with your GPU
+python-dotenv
+biopython
+lxml
