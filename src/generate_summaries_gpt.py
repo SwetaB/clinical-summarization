@@ -8,12 +8,11 @@ import openai
 
 from dotenv import load_dotenv
 load_dotenv()
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Set your OpenAI API key
 
-# Prompt templates
+
+# Prompt template for structured summary
 def create_structured_prompt(case_text):
     return (
         "Summarize the following clinical case using the structured format:\n\n"
@@ -22,12 +21,20 @@ def create_structured_prompt(case_text):
         f"Clinical Case:\n{case_text}\n\nStructured Summary:"
     )
 
+
 def create_freeform_prompt(case_text):
     return (
         "Summarize the following clinical case in 3–4 sentences using a scientific, PubMed-style tone. "
         "Focus on symptoms, interventions, and outcomes.\n\n"
         f"Clinical Case:\n{case_text}\n\nSummary:"
     )
+
+
+# Check if structured summary looks valid
+def is_structured_summary_good(summary):
+    required_phrases = ["A ", "-year-old", "presented with", "Intervention included", "Outcome was"]
+    return all(phrase in summary for phrase in required_phrases)
+
 
 # GPT query with token logging
 def call_gpt(prompt, model="gpt-4", top_p=0.2, temperature=0.3, max_retries=5):
@@ -66,7 +73,7 @@ def call_gpt(prompt, model="gpt-4", top_p=0.2, temperature=0.3, max_retries=5):
 
     raise Exception(f"Failed after {max_retries} retries.")
 
-# Main function
+
 def generate_summaries(case_list):
     all_outputs = []
     total_tokens = 0
