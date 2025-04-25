@@ -15,8 +15,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Prompt template for structured summary
 def create_structured_prompt(case_text):
     return (
+        "Given the following clinical case, first extract any relevant patient history or diagnosis, "
         "Summarize the following clinical case using the structured format:\n\n"
         "Format:\n"
+        "History: [important prior medical conditions if any]\n"
         "A [age]-year-old [sex] presented with [symptom]. Intervention included [treatment]. Outcome was [result].\n\n"
         f"Clinical Case:\n{case_text}\n\nStructured Summary:"
     )
@@ -77,7 +79,7 @@ def generate_structured_summaries(clinical_df, checkpoint_every=500):
 
         prompt = create_structured_prompt(case_report)
 
-        # Try with GPT-3.5 first
+        # GPT-4
         summary, usage = safe_call_gpt(prompt, model="gpt-3.5-turbo")
         total_tokens += usage["total_tokens"]
 
@@ -103,7 +105,7 @@ def generate_structured_summaries(clinical_df, checkpoint_every=500):
 
 # Example usage
 if __name__ == "__main__":
-    clinical_cases_df = pd.read_csv("./data/raw/PMC-Patients-Subset-ls1500.csv").sample(n=5, random_state=657)
+    clinical_cases_df = pd.read_csv("./data/raw/PMC-Patients-Subset-ls1500.csv").sample(n=500, random_state=657)
 
     final_filename, total_tokens = generate_structured_summaries(clinical_cases_df)
 
