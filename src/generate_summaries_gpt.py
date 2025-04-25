@@ -30,13 +30,16 @@ def create_freeform_prompt(case_text):
     )
 
 # GPT query with token logging
-def call_gpt(prompt, model="gpt-4", temperature=0.3, max_retries=5):
+def call_gpt(prompt, model="gpt-4", top_p=0.2, temperature=0.3, max_retries=5):
+    
+
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
+                top_p=top_p,
                 max_tokens=300,
             )
             summary = response.choices[0].message.content.strip()
@@ -71,7 +74,7 @@ def generate_summaries(case_list):
         if not case.strip():
             continue
         try:
-            structured_summary, usage_structured = call_gpt(create_structured_prompt(case), temperature=0.2)
+            structured_summary, usage_structured = call_gpt(create_structured_prompt(case), top_p=0.1, temperature=0.2)
             # freeform_summary, usage_freeform = call_gpt(create_freeform_prompt(case), temperature=0.3)
 
             all_outputs.append({
@@ -114,7 +117,7 @@ if __name__ == "__main__":
     cost_estimate = (total_tokens / 1000) * 0.09  # rough average
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"./data/summaries/gpt4_summaries_{timestamp}.csv"
+    output_filename = f"./data/summaries/gpt3.5-turbo_summaries_{timestamp}.csv"
 
     df.to_csv(output_filename, index=False)
 
