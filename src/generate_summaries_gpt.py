@@ -27,7 +27,7 @@ def is_structured_summary_good(summary):
     return all(phrase in summary for phrase in required_phrases)
 
 # Safe call with retry logic
-def safe_call_gpt(prompt, model="gpt-3.5-turbo", max_retries=5):
+def safe_call_gpt(prompt, model="gpt-4", max_retries=5):
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
@@ -62,13 +62,16 @@ def safe_call_gpt(prompt, model="gpt-3.5-turbo", max_retries=5):
     raise Exception(f" Failed after {max_retries} retries.")
 
 # Main function
-def generate_structured_summaries(cases, checkpoint_every=500):
+def generate_structured_summaries(clinical_df, checkpoint_every=500):
     results = []
     total_tokens = 0
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_prefix = f"./data/summaries/structured_summaries_{timestamp}"
 
-    for idx, case_report in enumerate(cases):
+    cases = clinical_df['patient'].to_list()
+    patient_ids = clinical_df['patient_id'].to_list()
+
+    for idx, (case_report, patient_id) in enumerate(zip(cases, patient_ids)):
         if not case_report.strip():
             continue
 
@@ -78,13 +81,8 @@ def generate_structured_summaries(cases, checkpoint_every=500):
         summary, usage = safe_call_gpt(prompt, model="gpt-3.5-turbo")
         total_tokens += usage["total_tokens"]
 
-        # Validate
-        if not is_structured_summary_good(summary):
-            print(f"Bad structure detected for case {idx+1}. Retrying with GPT-4...")
-            summary, usage = safe_call_gpt(prompt, model="gpt-4")
-            total_tokens += usage["total_tokens"]
-
         results.append({
+            "patient_id": patient_id,
             "case": case_report,
             "structured_summary": summary
         })
@@ -105,26 +103,9 @@ def generate_structured_summaries(cases, checkpoint_every=500):
 
 # Example usage
 if __name__ == "__main__":
-    clinical_cases = [
-        "A 39-year-old man was hospitalized due to an increasingly reduced general health condition, after persistent fever and dry cough for 2 weeks...",
-        "One week after a positive COVID-19 result, this 57-year-old male was admitted to the ICU because of oxygen desaturation (70%)...",
-        """A 39-year-old man was hospitalized due to an increasingly reduced general health condition, after 
-        persistent fever and dry cough for 2 weeks. The patient initially needed 4 L/min of oxygen, had a rapid and 
-        shallow breathing pattern at rest and became severely breathless during minor physical activities. In the beginning,
-        physical therapy focused on patient education about dyspnea-relieving positions, the importance of regular mobilization, 
-        and deep-breathing exercises. However, it quickly became evident that his anxiety from fear of dying and worries 
-        about his future aggravated his dyspnea and vice versa. The patient was so dyspneic, anxious, and weak that he 
-        was barely able to walk to the toilet. To counter this vicious circle, the physical therapist actively listened to the 
-        patient, explained why he was experiencing breathlessness, and tested suitable positions to relieve his dyspnea. 
-        He seemed to benefit from the education and the relaxing breathing exercises, as seen on day 2, when his r
-        espiratory rate could be reduced from 30 breaths/min to 22 breaths/min and his oxygen saturation increased 
-        from 92% to 96% on 4 L/min oxygen after guiding him through some deep-breathing exercises. Over the next 
-        days, his dyspnea and anxiety started to alleviate and he regained his self-confidence. Therapy was 
-        progressively shifted to walking and strength training and the patient rapidly advanced to walk 350 m 
-        without a walking aid or supplemental oxygen before his discharge home"""
-    ]
+    clinical_cases_df = pd.read_csv("./data/raw/PMC-Patients-Subset-ls1500.csv").sample(n=5, random_state=657)
 
-    final_filename, total_tokens = generate_structured_summaries(clinical_cases)
+    final_filename, total_tokens = generate_structured_summaries(clinical_cases_df)
 
     cost_estimate = (total_tokens / 1000) * 0.09  # assuming worst case GPT-4 cost
 
