@@ -178,3 +178,7 @@ data
 
 # Models files
 models
+*.pt
+*.safetensors
+models/**
+

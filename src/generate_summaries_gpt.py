@@ -1,16 +1,16 @@
+import openai
 import os
 import pandas as pd
-from datetime import datetime
 import time
 import random
+from datetime import datetime
 from openai import OpenAI
-import openai
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
 
 # Prompt template for structured summary
 def create_structured_prompt(case_text):
@@ -21,32 +21,20 @@ def create_structured_prompt(case_text):
         f"Clinical Case:\n{case_text}\n\nStructured Summary:"
     )
 
-
-def create_freeform_prompt(case_text):
-    return (
-        "Summarize the following clinical case in 3–4 sentences using a scientific, PubMed-style tone. "
-        "Focus on symptoms, interventions, and outcomes.\n\n"
-        f"Clinical Case:\n{case_text}\n\nSummary:"
-    )
-
-
 # Check if structured summary looks valid
 def is_structured_summary_good(summary):
     required_phrases = ["A ", "-year-old", "presented with", "Intervention included", "Outcome was"]
     return all(phrase in summary for phrase in required_phrases)
 
-
-# GPT query with token logging
-def call_gpt(prompt, model="gpt-4", top_p=0.2, temperature=0.3, max_retries=5):
-    
-
+# Safe call with retry logic
+def safe_call_gpt(prompt, model="gpt-3.5-turbo", max_retries=5):
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                top_p=top_p,
+                temperature=0.2,
+                top_p=0.1,
                 max_tokens=300,
             )
             summary = response.choices[0].message.content.strip()
@@ -58,44 +46,62 @@ def call_gpt(prompt, model="gpt-4", top_p=0.2, temperature=0.3, max_retries=5):
             return summary, usage
 
         except openai.RateLimitError:
-            wait_time = random.uniform(5, 15)  # random wait between 5-15 seconds
-            print(f"Rate limit hit. Retrying in {wait_time:.1f} seconds...")
+            wait_time = random.uniform(5, 15)
+            print(f" Rate limit hit. Retrying in {wait_time:.1f} seconds...")
             time.sleep(wait_time)
 
         except openai.APIError as e:
             wait_time = random.uniform(5, 15)
-            print(f"API Error: {e}. Retrying in {wait_time:.1f} seconds...")
+            print(f" API Error: {e}. Retrying in {wait_time:.1f} seconds...")
             time.sleep(wait_time)
 
         except Exception as e:
-            print(f"Unexpected error: {e}")
-            raise e  # re-raise if something else (like bad input)
+            print(f" Unexpected error: {e}")
+            raise e
 
-    raise Exception(f"Failed after {max_retries} retries.")
+    raise Exception(f" Failed after {max_retries} retries.")
 
-
-def generate_summaries(case_list):
-    all_outputs = []
+# Main function
+def generate_structured_summaries(cases, checkpoint_every=500):
+    results = []
     total_tokens = 0
-    for idx, case in enumerate(case_list):
-        if not case.strip():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_prefix = f"./data/summaries/structured_summaries_{timestamp}"
+
+    for idx, case_report in enumerate(cases):
+        if not case_report.strip():
             continue
-        try:
-            structured_summary, usage_structured = call_gpt(create_structured_prompt(case), top_p=0.1, temperature=0.2)
-            # freeform_summary, usage_freeform = call_gpt(create_freeform_prompt(case), temperature=0.3)
 
-            all_outputs.append({
-                "case": case,
-                "structured_summary": structured_summary
-                # "freeform_summary": freeform_summary
-            })
-            # total_tokens += usage_structured["total_tokens"] + usage_freeform["total_tokens"]
-            total_tokens += usage_structured["total_tokens"]
+        prompt = create_structured_prompt(case_report)
 
-            print(f"Processed case {idx+1}/{len(case_list)} — Tokens so far: {total_tokens}")
-        except Exception as e:
-            print(f"Error in case {idx+1}: {e}")
-    return pd.DataFrame(all_outputs), total_tokens
+        # Try with GPT-3.5 first
+        summary, usage = safe_call_gpt(prompt, model="gpt-3.5-turbo")
+        total_tokens += usage["total_tokens"]
+
+        # Validate
+        if not is_structured_summary_good(summary):
+            print(f"Bad structure detected for case {idx+1}. Retrying with GPT-4...")
+            summary, usage = safe_call_gpt(prompt, model="gpt-4")
+            total_tokens += usage["total_tokens"]
+
+        results.append({
+            "case": case_report,
+            "structured_summary": summary
+        })
+
+        # Every checkpoint_every cases, save progress
+        if (idx + 1) % checkpoint_every == 0:
+            temp_df = pd.DataFrame(results)
+            checkpoint_filename = f"{output_prefix}_checkpoint_{idx+1}.csv"
+            temp_df.to_csv(checkpoint_filename, index=False)
+            print(f"Checkpoint saved at {checkpoint_filename} after {idx+1} cases.")
+
+    # Save final full results
+    final_df = pd.DataFrame(results)
+    final_filename = f"{output_prefix}_final.csv"
+    final_df.to_csv(final_filename, index=False)
+
+    return final_filename, total_tokens
 
 # Example usage
 if __name__ == "__main__":
@@ -118,16 +124,14 @@ if __name__ == "__main__":
         without a walking aid or supplemental oxygen before his discharge home"""
     ]
 
-    df, total_tokens = generate_summaries(clinical_cases)
+    final_filename, total_tokens = generate_structured_summaries(clinical_cases)
 
-    # Estimate cost (gpt-4 pricing ~$0.03 per 1k prompt tokens and ~$0.06 per 1k completion tokens)
-    cost_estimate = (total_tokens / 1000) * 0.09  # rough average
+    cost_estimate = (total_tokens / 1000) * 0.09  # assuming worst case GPT-4 cost
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"./data/summaries/gpt3.5-turbo_summaries_{timestamp}.csv"
+    print(f"\n Final summaries saved to '{final_filename}'")
+    print(f" Total tokens used: {total_tokens}")
+    print(f" Estimated cost: ${cost_estimate:.2f}")
 
-    df.to_csv(output_filename, index=False)
 
-    print(f"\n Summaries saved to '{output_filename}'")
-    print(f"Total tokens used: {total_tokens}")
-    print(f"Estimated cost: ${cost_estimate:.4f}")
+
+
