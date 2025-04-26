@@ -12,22 +12,31 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from datasets import Dataset
 
 
+def get_model_save_dir(model_name, dataset_tag):
+    base_model_dir = "./models"
+    model_folder = model_name.replace("/", "_")
+    save_dir = os.path.join(base_model_dir, model_folder, dataset_tag)
+    os.makedirs(save_dir, exist_ok=True)
+    return save_dir
+
+
 def save_datasets_as_csv(train_dataset, val_dataset,  model_name, dataset_tag):
-    base_dir = "./data/train_test"
+    base_data_dir = "./data/train_test"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_dir, model_folder)
+    save_dir = os.path.join(base_data_dir, model_folder, dataset_tag)
     os.makedirs(save_dir, exist_ok=True)
 
-    train_file = os.path.join(save_dir, f"train_{dataset_tag}_{timestamp}.csv")
-    val_file = os.path.join(save_dir, f"val_{dataset_tag}_{timestamp}.csv")
+    train_file = os.path.join(save_dir, f"train_{timestamp}.csv")
+    val_file = os.path.join(save_dir, f"val_{timestamp}.csv")
 
     pd.DataFrame(train_dataset).to_csv(train_file, index=False)
     pd.DataFrame(val_dataset).to_csv(val_file, index=False)
 
     print(f"Training data saved to {train_file}")
     print(f"Validation data saved to {val_file}")
+
 
 def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):
     print(f"Loading {model_type.upper()} model and tokenizer from: {model_path}")
@@ -47,6 +56,7 @@ def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):
         return model, tokenizer
     except Exception as e:
         raise OSError(f"Error loading model/tokenizer from {model_path}. Details: {e}")
+
 
 def chunk_text(text, tokenizer, max_tokens=1024):
     token_ids = tokenizer.encode(text, truncation=False)
@@ -93,16 +103,16 @@ def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models
 
     training_args = TrainingArguments(
         output_dir=save_dir,
-        num_train_epochs=5,             # number of training epochs
-        per_device_train_batch_size=8,   # Batch size per GPU/CPU for training. Total batch size = per_device_train_batch_size * num_gpus
-        per_device_eval_batch_size=8,    
-        warmup_steps=500,                # number of warmup steps for learning rate scheduler
-        weight_decay=0.01,               # strength of weight decay
-        logging_dir='./logs',            # directory for storing logs
-        evaluation_strategy="epoch",     # evaluation strategy
-        save_strategy="epoch",           # save checkpoint every epoch
-        save_total_limit=3,              # limit the total number of checkpoints
-        load_best_model_at_end=True,     # load the best model when finished training
+        num_train_epochs=3,
+        per_device_train_batch_size=4,    # Batch size per GPU/CPU for training. Total batch size = per_device_train_batch_size * num_gpus
+        per_device_eval_batch_size=4,    
+        warmup_steps=500,                 # number of warmup steps for learning rate scheduler
+        weight_decay=0.01,                # strength of weight decay
+        logging_dir='./logs',             # directory for storing logs
+        evaluation_strategy="epoch",      # evaluation strategy
+        save_strategy="epoch",            # save checkpoint every epoch
+        save_total_limit=3,               # limit the total number of checkpoints
+        load_best_model_at_end=True,      # load the best model when finished training
         metric_for_best_model="eval_loss", # Metric to monitor for best model
         greater_is_better=False,         # For loss, lower is better
         logging_steps=100, 
@@ -142,8 +152,10 @@ def run_fine_tuning(file_path):
     # MODEL_PATH = 'Falconsai/medical_summarization'
     # MODEL_PATH = 'facebook/bart-large-cnn'
 
-    MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
-    SAVE_DIR = "./models/fine_tuned_model"
+    # MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
+    MODEL_PATH="t5-small"
+    DATASET_TAG = "clinical_notes_16500"
+    SAVE_DIR = get_model_save_dir(model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
 
     try:
         model, tokenizer = load_model_and_tokenizer(model_path=MODEL_PATH)
@@ -154,9 +166,9 @@ def run_fine_tuning(file_path):
     # Tokenize the data
     print("Starting data tokenization...")
     try:
-        train_dataset, val_dataset = tokenize_data(df_processed, tokenizer)
+        train_dataset, val_dataset = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=128)
         print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
-        save_datasets_as_csv(train_dataset, val_dataset, model_name=MODEL_PATH, dataset_tag="clinical_notes_16500")
+        save_datasets_as_csv(train_dataset, val_dataset, model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
     except Exception as e:
         print(f"Error occured during tokenization: {e}")
         return
