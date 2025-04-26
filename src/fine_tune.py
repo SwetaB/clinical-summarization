@@ -1,134 +1,98 @@
-import torch
-from transformers import Trainer, TrainingArguments
-from transformers import T5ForConditionalGeneration, T5Tokenizer
-from transformers import BartForConditionalGeneration, BartTokenizer
-from transformers import DataCollatorForSeq2Seq 
-from datasets import Dataset
-from sklearn.model_selection import train_test_split
 import pandas as pd
 import os
+from sklearn.model_selection import train_test_split
+from datetime import datetime
+import torch
+
+from transformers import Trainer, TrainingArguments, DataCollatorForSeq2Seq
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import BartForConditionalGeneration, BartTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+from datasets import Dataset
 
 
-def save_datasets_as_csv(train_dataset, val_dataset, train_file='data/train_test/train_data-Falconsai_MedicalSumm_1.csv', val_file='data/train_test/val_data-Falconsai_MedicalSumm_1.csv'):
-    """
-    Save the tokenized train and validation datasets to CSV files.
-    
-    Args:
-        train_dataset: The tokenized training dataset.
-        val_dataset: The tokenized validation dataset.
-        train_file (str): The name of the file to save the training data.
-        val_file (str): The name of the file to save the validation data.
-    """
-    # Convert to pandas DataFrame
-    train_df = pd.DataFrame(train_dataset)
-    val_df = pd.DataFrame(val_dataset)
+def save_datasets_as_csv(train_dataset, val_dataset,  model_name, dataset_tag):
+    base_dir = "./data/train_test"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Save to CSV
-    train_df.to_csv(train_file, index=False)
-    val_df.to_csv(val_file, index=False)
+    model_folder = model_name.replace("/", "_")
+    save_dir = os.path.join(base_dir, model_folder)
+    os.makedirs(save_dir, exist_ok=True)
+
+    train_file = os.path.join(save_dir, f"train_{dataset_tag}_{timestamp}.csv")
+    val_file = os.path.join(save_dir, f"val_{dataset_tag}_{timestamp}.csv")
+
+    pd.DataFrame(train_dataset).to_csv(train_file, index=False)
+    pd.DataFrame(val_dataset).to_csv(val_file, index=False)
 
     print(f"Training data saved to {train_file}")
     print(f"Validation data saved to {val_file}")
 
-
-def load_model_and_tokenizer(model_path: str):
-    """
-    Load the model and tokenizer for inference.
-    """
-    print(f"Attempting to load model and tokenizer from: {model_path}")
+def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):
+    print(f"Loading {model_type.upper()} model and tokenizer from: {model_path}")
     try:
-        # *** Changed from Bart to T5 ***
-        # model = T5ForConditionalGeneration.from_pretrained(model_path)
-        # tokenizer = T5Tokenizer.from_pretrained(model_path)
-        model = BartForConditionalGeneration.from_pretrained(model_path)
-        tokenizer = BartTokenizer.from_pretrained(model_path)
-        print(f"Successfully loaded model and tokenizer from {model_path}")
+        if model_type.lower() == "bart":
+            model = BartForConditionalGeneration.from_pretrained(model_path)
+            tokenizer = BartTokenizer.from_pretrained(model_path)
+        elif model_type.lower() == "t5":
+            model = T5ForConditionalGeneration.from_pretrained(model_path)
+            tokenizer = T5Tokenizer.from_pretrained(model_path)
+        elif model_type.lower() == "auto":
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+        else:
+            raise ValueError(f"Unsupported model type: {model_type}")
+        print("Successfully loaded.")
         return model, tokenizer
     except Exception as e:
-        # The error message from the library is quite informative here, keep it
-        raise OSError(f"Error loading model or tokenizer from {model_path}. Details: {e}")
+        raise OSError(f"Error loading model/tokenizer from {model_path}. Details: {e}")
+
+def chunk_text(text, tokenizer, max_tokens=1024):
+    token_ids = tokenizer.encode(text, truncation=False)
+    chunks = []
+    for i in range(0, len(token_ids), max_tokens):
+        chunk_ids = token_ids[i:i+max_tokens]
+        chunk_text = tokenizer.decode(chunk_ids, skip_special_tokens=True)
+        chunks.append(chunk_text)
+    return chunks
 
 
-def tokenize_data(df, tokenizer):
-    """
-    Tokenize the data using the provided tokenizer.
-    
-    Args:
-        df (pandas.DataFrame): The dataframe with preprocessed text.
-        tokenizer: The tokenizer (e.g., from Hugging Face).
-    
-    Returns:
-        Tuple: tokenized train and validation datasets.
-    """
+def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=250):
+    dataset = Dataset.from_pandas(df[['patient_id', 'case', 'structured_summary']])
 
-    # Convert to Hugging Face Dataset
-    dataset = Dataset.from_pandas(df[['patient_uid', 'Processed_Patient_Text', 'Processed_Abstract']])
+    def tokenize_inputs(examples):
+        all_inputs = []
+        for text in examples['case']:
+            chunks = chunk_text(text, tokenizer, max_tokens=max_input_length)
+            all_inputs.append(chunks[0])  # Use only first chunk for now
+        return tokenizer(all_inputs, truncation=True, padding='max_length', max_length=max_input_length)
 
-    # Define max lengths based on typical model limits and potential data analysis
-    # You should analyze your data to confirm these are appropriate
-    max_input_length = 512
-    max_target_length = 250
-
-    # Tokenize the input (patient text)
-    def tokenize_function(examples):
-        return tokenizer(examples['Processed_Patient_Text'], truncation=True, max_length=max_input_length)
-
-    dataset = dataset.map(tokenize_function, batched=True)
-
-    # Tokenize the target (abstract)
-    def tokenize_target(examples):
-        # Ensure that the target (abstract) is a valid string
-        # Replace NaN or None with an empty string or placeholder
-        examples['Processed_Abstract'] = [str(text) if isinstance(text, str) else "" for text in examples['Processed_Abstract']]
-        encoding = tokenizer(examples['Processed_Abstract'], truncation=True, padding='max_length', max_length=max_target_length)
-        examples['labels'] = encoding['input_ids']
+    def tokenize_targets(examples):
+        examples['structured_summary'] = [str(t) if isinstance(t, str) else "" for t in examples['structured_summary']]
+        targets = tokenizer(examples['structured_summary'], truncation=True, padding='max_length', max_length=max_target_length)
+        examples['labels'] = targets['input_ids']
         return examples
 
+    dataset = dataset.map(tokenize_inputs, batched=True)
+    dataset = dataset.map(tokenize_targets, batched=True)
+    dataset = dataset.remove_columns(['case', 'structured_summary'])
+    dataset.set_format(type='torch', columns=['patient_id', 'input_ids', 'attention_mask', 'labels'])
 
-    dataset = dataset.map(tokenize_target, batched=True)
-
-    print(f"Columns after tokenization: {dataset.column_names}") 
-
-    # Remove the original text columns as they are no longer needed for training input
-    dataset = dataset.remove_columns(['Processed_Patient_Text', 'Processed_Abstract'])
-
-    # Set format for model input
-    dataset.set_format(type='torch', columns=['patient_uid', 'input_ids', 'attention_mask', 'labels'])
-
-    # Split into training and validation sets
-    split_datasets = dataset.train_test_split(test_size=0.2, seed=42)
-    train_dataset = split_datasets['train']
-    val_dataset = split_datasets['test']
-
-    # Extract patient_uids for train and validation sets
-    train_uids = train_dataset['patient_uid']
-    val_uids = val_dataset['patient_uid']
-    save_datasets_as_csv(train_uids, val_uids)
-
-    # Split into training and validation sets
-    train_dataset, val_dataset = dataset.train_test_split(test_size=0.2, seed=42).values()
-    
-    return train_dataset, val_dataset
+    split = dataset.train_test_split(test_size=0.2, seed=42)
+    return split['train'], split['test']
 
 
-# Function to fine-tune the BART model
-def train_model(train_dataset, val_dataset, tokenizer, model):
-    """
-    Fine-tune the BART model using the training and validation datasets.
-    
-    Args:
-        train_dataset: The tokenized training dataset.
-        val_dataset: The tokenized validation dataset.
-        tokenizer: The tokenizer to use for the model.
-        model: The pre-trained model.
-    
-    Returns:
-        Trainer: The trained model.
-    """
+def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models/clinical_summarization_checkpoints"):
+    '''
+    # When using distributed training, ensure only the main process saves the model
+    # trainer.is_world_process_zero() can be used if saving within the Trainer logic
+    # If saving outside, a simple check might be needed depending on setup
+    # For this example, saving after trainer.train() is fine as Trainer handles this
+    '''
 
-    # Define the training arguments
     training_args = TrainingArguments(
-        output_dir='./models/fine_tune_facebook/clinical_summarization_checkpoints",',          # output directory
+        output_dir=save_dir,
         num_train_epochs=5,             # number of training epochs
         per_device_train_batch_size=8,   # Batch size per GPU/CPU for training. Total batch size = per_device_train_batch_size * num_gpus
         per_device_eval_batch_size=8,    
@@ -145,11 +109,8 @@ def train_model(train_dataset, val_dataset, tokenizer, model):
         report_to="none"                 # Disable reporting to external services like W&B
     )
 
-    # Initialize the Data Collator for dynamic padding
-    # This collator will pad sequences within each batch
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
-    # Initialize the Trainer
     trainer = Trainer(
         model=model,                         # the pre-trained model
         args=training_args,                  # training arguments
@@ -159,93 +120,58 @@ def train_model(train_dataset, val_dataset, tokenizer, model):
         data_collator=data_collator          # Use the data collator for dynamic padding
     )
 
-    # Fine-tune the model
-    # The trainer.train() call will automatically distribute training across available GPUs
-    # when the script is launched correctly.
     print("Starting model training...")
     trainer.train()
+    
+    final_save_dir = os.path.join(save_dir, "final_model")
+    os.makedirs(final_save_dir, exist_ok=True)
+    trainer.save_model(final_save_dir)
+    tokenizer.save_pretrained(final_save_dir)
+    print(f"Model saved to {final_save_dir}")
 
     return trainer
 
 
-# Function to save the fine-tuned model
-def save_model(model, tokenizer, output_dir):
-    """
-    Save the fine-tuned model and tokenizer.
-    
-    Args:
-        model: The fine-tuned model.
-        tokenizer: The tokenizer used for preprocessing.
-        output_dir (str): Directory to save the model.
-    """
-
-    os.makedirs(output_dir, exist_ok=True)
-
-
-    # When using distributed training, ensure only the main process saves the model
-    # trainer.is_world_process_zero() can be used if saving within the Trainer logic
-    # If saving outside, a simple check might be needed depending on setup
-    # For this example, saving after trainer.train() is fine as Trainer handles this
-    model.save_pretrained(output_dir)
-    tokenizer.save_pretrained(output_dir)
-    print(f"Model saved to {output_dir}")
-
-
 # Function to run the entire process
 def run_fine_tuning(file_path):
-    """
-    Load data, preprocess it, tokenize, fine-tune the model, and save it.
-    
-    Args:
-        file_path (str): Path to the raw data.
-    """
-    # Preprocess the data
+   
+    # load data
     df_processed = pd.read_csv(file_path)
     
     # Load the tokenizer, model
-    # example : BartTokenizer.from_pretrained('facebook/bart-base')
     # MODEL_PATH = 'Falconsai/medical_summarization'
-    MODEL_PATH = 'facebook/bart-large-cnn'
+    # MODEL_PATH = 'facebook/bart-large-cnn'
+
+    MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
+    SAVE_DIR = "./models/fine_tuned_model"
+
     try:
         model, tokenizer = load_model_and_tokenizer(model_path=MODEL_PATH)
-    except OSError as e:
-        print(f"Could not load model or tokenizer: {e}")
-        return
     except Exception as e:
-        print(f"An unexpected error occurred while loading model/tokenizer: {e}")
+        print(f"Error occurred while loading model/tokenizer: {e}")
         return
 
-     # Tokenize the data
+    # Tokenize the data
     print("Starting data tokenization...")
     try:
-        # Tokenization happens on the main process, then the dataset is shared# Tokenization happens on the main process, then the dataset is shared
         train_dataset, val_dataset = tokenize_data(df_processed, tokenizer)
-        print("Data tokenization finished.")
-        print(f"Training dataset size: {len(train_dataset)}")
-        print(f"Validation dataset size: {len(val_dataset)}")
+        print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
+        save_datasets_as_csv(train_dataset, val_dataset, model_name=MODEL_PATH, dataset_tag="clinical_notes_16500")
     except Exception as e:
-        print(f"An error occurred during data tokenization: {e}")
+        print(f"Error occured during tokenization: {e}")
         return
 
     # Fine-tune the model
     try:
-        # The train_model function will handle the multi-GPU training via the Trainer
-        trainer = train_model(train_dataset, val_dataset, tokenizer, model)
+        trainer = train_model(train_dataset, val_dataset, tokenizer, model, save_dir=SAVE_DIR)
     except Exception as e:
-        print(f"An error occurred during model training: {e}")
+        print(f"Error occured during training: {e}")
         return
-
-    # Save the model
-    MODEL_OUTPUT_DIR='./models/fine_tune_facebook'
-    try:
-        # The Trainer ensures that save_model is only called by the main process
-        save_model(trainer.model, tokenizer, MODEL_OUTPUT_DIR)
-    except Exception as e:
-        print(f"An error occurred while saving the model: {e}")
-        return
+    
+    print(f"Fine-tuning complete. Model saved at: {SAVE_DIR}/final_model")
 
 
 # Run the fine-tuning process
 if __name__ == "__main__":
-    file_path = 'data/processed/PMC-Patients-Processed.csv'  # Adjust path if necessary
+    file_path = 'data/summaries/structured_summaries_20250425_202927_checkpoint_16500.csv'  # Adjust path if necessary
     run_fine_tuning(file_path)

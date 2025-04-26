@@ -105,7 +105,7 @@ def generate_structured_summaries(clinical_df, checkpoint_every=500):
 
 # Example usage
 if __name__ == "__main__":
-    clinical_cases_df = pd.read_csv("./data/raw/PMC-Patients-Subset-ls1500.csv").sample(n=500, random_state=657)
+    clinical_cases_df = pd.read_csv("./data/raw/PMC-Patients-Subset-ls1500.csv").sample(n=30000, random_state=657)
 
     final_filename, total_tokens = generate_structured_summaries(clinical_cases_df)
 
