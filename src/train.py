@@ -10,87 +10,48 @@ from transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from datasets import Dataset
+from weighted_trainer import WeightedChunkTrainer
+from utils import load_model_and_tokenizer, get_model_save_dir, save_datasets, chunk_text
 
 
-def get_model_save_dir(model_name, dataset_tag):
-    base_model_dir = "./models"
-    model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_model_dir, model_folder, dataset_tag)
-    os.makedirs(save_dir, exist_ok=True)
-    return save_dir
-
-
-def save_datasets_as_csv(train_dataset, val_dataset,  model_name, dataset_tag):
-    base_data_dir = "./data/train_test"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_data_dir, model_folder, dataset_tag)
-    os.makedirs(save_dir, exist_ok=True)
-
-    train_file = os.path.join(save_dir, f"train_{timestamp}.csv")
-    val_file = os.path.join(save_dir, f"val_{timestamp}.csv")
-
-    pd.DataFrame(train_dataset).to_csv(train_file, index=False)
-    pd.DataFrame(val_dataset).to_csv(val_file, index=False)
-
-    print(f"Training data saved to {train_file}")
-    print(f"Validation data saved to {val_file}")
-
-
-def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):
-    print(f"Loading {model_type.upper()} model and tokenizer from: {model_path}")
-    try:
-        if model_type.lower() == "bart":
-            model = BartForConditionalGeneration.from_pretrained(model_path)
-            tokenizer = BartTokenizer.from_pretrained(model_path)
-        elif model_type.lower() == "t5":
-            model = T5ForConditionalGeneration.from_pretrained(model_path)
-            tokenizer = T5Tokenizer.from_pretrained(model_path)
-        elif model_type.lower() == "auto":
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
-            tokenizer = AutoTokenizer.from_pretrained(model_path)
-        else:
-            raise ValueError(f"Unsupported model type: {model_type}")
-        print("Successfully loaded.")
-        return model, tokenizer
-    except Exception as e:
-        raise OSError(f"Error loading model/tokenizer from {model_path}. Details: {e}")
-
-
-def chunk_text(text, tokenizer, max_tokens=1024):
-    token_ids = tokenizer.encode(text, truncation=False)
-    chunks = []
-    for i in range(0, len(token_ids), max_tokens):
-        chunk_ids = token_ids[i:i+max_tokens]
-        chunk_text = tokenizer.decode(chunk_ids, skip_special_tokens=True)
-        chunks.append(chunk_text)
-    return chunks
-
-
-def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=250):
+def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
     dataset = Dataset.from_pandas(df[['patient_id', 'case', 'structured_summary']])
 
-    def tokenize_inputs(examples):
-        all_inputs = []
-        for text in examples['case']:
+    def tokenize_examples(examples):
+        all_inputs, all_chunk_ids, all_targets, all_patient_ids= [], [], [], []
+
+        # using all chunks and extending targets to all chunks
+        for text, summary in zip(examples['case'], examples['structured_summary']):
             chunks = chunk_text(text, tokenizer, max_tokens=max_input_length)
-            all_inputs.append(chunks[0])  # Use only first chunk for now
-        return tokenizer(all_inputs, truncation=True, padding='max_length', max_length=max_input_length)
+            # all_inputs.append(chunks[0])  # Use only first chunk for now
+            all_inputs.extend(chunks)
+            all_chunk_ids.extend(list(range(len(chunks))))
+            all_targets.extend([summary] * len(chunks))
 
-    def tokenize_targets(examples):
-        examples['structured_summary'] = [str(t) if isinstance(t, str) else "" for t in examples['structured_summary']]
-        targets = tokenizer(examples['structured_summary'], truncation=True, padding='max_length', max_length=max_target_length)
-        examples['labels'] = targets['input_ids']
-        return examples
+        # Why is padding max lenght
+        inputs = tokenizer(all_inputs, truncation=True, padding='max_length', max_length=max_input_length)
+        labels = tokenizer(all_targets, truncation=True, padding='max_length', max_length=max_target_length)
 
-    dataset = dataset.map(tokenize_inputs, batched=True)
-    dataset = dataset.map(tokenize_targets, batched=True)
-    dataset = dataset.remove_columns(['case', 'structured_summary'])
-    dataset.set_format(type='torch', columns=['patient_id', 'input_ids', 'attention_mask', 'labels'])
+        inputs['labels'] = labels['input_ids']
+        inputs['chunk_id'] = all_chunk_ids
+        inputs['patient_id'] = all_patient_ids
+        return inputs
 
-    split = dataset.train_test_split(test_size=0.2, seed=42)
-    return split['train'], split['test']
+    dataset = dataset.map(tokenize_examples, batched=True, remove_columns=['case', 'structured_summary'])
+
+    assert 'patient_id' in dataset.features, "Error: patient_id was dropped during tokenization!"
+    print("Patient IDs correctly preserved after tokenization.")
+    
+    dataset.set_format(type='torch', columns=['patient_id','input_ids', 'attention_mask', 'labels', 'chunk_id'])
+
+    # Split into train, val, test
+    train_val_split = dataset.train_test_split(test_size=0.3, seed=42)
+    train_dataset = train_val_split['train']
+    val_test_split = train_val_split['test'].train_test_split(test_size=0.5, seed=42)
+    val_dataset = val_test_split['train']
+    test_dataset = val_test_split['test']
+
+    return train_dataset, val_dataset, test_dataset
 
 
 def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models/clinical_summarization_checkpoints"):
@@ -151,8 +112,8 @@ def run_fine_tuning(file_path):
     # Load the tokenizer, model
     # MODEL_PATH = 'Falconsai/medical_summarization'
     # MODEL_PATH = 'facebook/bart-large-cnn'
-
     # MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
+    
     MODEL_PATH="t5-small"
     DATASET_TAG = "clinical_notes_16500"
     SAVE_DIR = get_model_save_dir(model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
@@ -166,9 +127,9 @@ def run_fine_tuning(file_path):
     # Tokenize the data
     print("Starting data tokenization...")
     try:
-        train_dataset, val_dataset = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=128)
+        train_dataset, val_dataset, test_dataset = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=256)
         print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
-        save_datasets_as_csv(train_dataset, val_dataset, model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
+        save_datasets(train_dataset, val_dataset, test_dataset, model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
     except Exception as e:
         print(f"Error occured during tokenization: {e}")
         return
