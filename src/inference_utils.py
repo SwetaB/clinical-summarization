@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from evaluate import load
+from config import * 
 
 
 def load_test_cases(full_df_path, test_csv_path):
@@ -14,12 +15,10 @@ def load_test_cases(full_df_path, test_csv_path):
 
 
 def save_predictions(patient_ids, inputs, predictions, model_name, dataset_tag, experiment_name="experiment"):
-    # Base output folder
-    base_output_dir = "./outputs"
 
     # Mirror structure: model/dataset
     model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_output_dir, model_folder, dataset_tag)
+    save_dir = os.path.join(BASE_OUTPUT_DIR, model_folder, dataset_tag)
     os.makedirs(save_dir, exist_ok=True)
 
     # Prediction file path
@@ -61,13 +60,11 @@ def compute_bertscore(predictions, references, lang="en"):
     }
 
 
-def save_metrics_csv(metrics_dict, model_name, dataset_tag, experiment_name="experiment"):
-    # Base outputs folder
-    base_output_dir = "./outputs"
+def save_metrics_csv(metrics_dict, model_name, dataset_tag, experiment_name="experiment", split_type="val"):
 
     # Mirror structure
     model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_output_dir, model_folder, dataset_tag)
+    save_dir = os.path.join(BASE_OUTPUT_DIR, model_folder, dataset_tag)
     os.makedirs(save_dir, exist_ok=True)
 
     # Metrics CSV path
@@ -75,6 +72,7 @@ def save_metrics_csv(metrics_dict, model_name, dataset_tag, experiment_name="exp
 
     # Add experiment name to metrics
     metrics_dict["experiment"] = experiment_name
+    metrics_dict["split"] = split_type
 
     # Save or append
     if os.path.exists(output_csv_path):

@@ -1,12 +1,14 @@
 import os
+import argparse
 import pandas as pd
 import torch
 from transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from utils import load_model_and_tokenizer
+from utils import load_model_and_tokenizer, get_model_save_dir
 from inference_utils import (load_test_cases, compute_rouge, compute_bertscore, 
                              save_metrics_csv, save_predictions)
+from config import *
 
 
 def generate_summary(model, tokenizer, text_or_texts, max_input_length=512, base_output_length=128, device="cpu"):
@@ -42,25 +44,30 @@ def generate_summary(model, tokenizer, text_or_texts, max_input_length=512, base
 
 # Example usage
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Run clinical summarization inference")
+    parser.add_argument('--input_filename', type=str, required=True, help="Path to the input CSV file for inference")
+    parser.add_argument('--split', type=str, choices=["train", "val", "test"], default="val", help="Data split type (default=val)")
+    args = parser.parse_args()
     
-    file_path = './data/summaries/structured_summaries_20250425_202927_checkpoint_16500.csv'
-    test_csv_path = './data/train_test/t5-small/clinical_notes_16500/val_20250426_140630.csv'
-    model_dir = './models/t5-small/clinical_notes_16500/final_model'
+    inference_file_path = f"{TRAIN_TEST_SPLIT_DIR}/{args.input_file}"
 
-    model, tokenizer = load_model_and_tokenizer(model_path=model_dir)
-    test_dataset = load_test_cases(file_path, test_csv_path)
+    model, tokenizer = load_model_and_tokenizer(model_path=FINAL_MODEL_DIR)
+    test_dataset = load_test_cases(INPUT_FILE, inference_file_path)
 
-    test_texts = test_dataset['case'].tolist()
+    test_texts = test_dataset['case'].tolist()[1:10]
+    patient_ids=test_dataset['patient_id'].to_list()[1:10]
     
     # Run inference
     generated_summaries = generate_summary(model, tokenizer, test_texts, base_output_length=256)
 
-    save_predictions(patient_ids=test_dataset['patient_id'].to_list() , 
+    save_predictions(patient_ids=patient_ids, 
                      inputs=test_texts, 
                      predictions=generated_summaries,
-                     model_name="t5-small", 
-                     dataset_tag="clinical_notes_16500",
-                     experiment_name="t5_small_16500_run1")
+                     model_name=MODEL_NAME, 
+                     dataset_tag=DATASET_TAG,
+                     experiment_name=EXPERIMENT_NAME,
+                     split_type=args.split)
     
     rouge_scores = compute_rouge(generated_summaries, test_texts)
     bertscore_scores = compute_bertscore(generated_summaries, test_texts)
@@ -74,4 +81,7 @@ metrics_to_save = {
 }
 
 # Save to CSV
-save_metrics_csv(metrics_to_save, model_name="t5-small", dataset_tag="clinical_notes_16500", experiment_name="t5_small_16500_run1")
+save_metrics_csv(metrics_to_save, 
+                 model_name=MODEL_NAME, 
+                 dataset_tag=DATASET_TAG, 
+                 experiment_name=EXPERIMENT_NAME)

@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from datasets import Dataset
 from weighted_trainer import WeightedChunkTrainer
 from utils import load_model_and_tokenizer, get_model_save_dir, save_datasets, chunk_text
-
+from config import *
 
 def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
     dataset = Dataset.from_pandas(df[['patient_id', 'case', 'structured_summary']])
@@ -113,13 +113,12 @@ def run_fine_tuning(file_path):
     # MODEL_PATH = 'Falconsai/medical_summarization'
     # MODEL_PATH = 'facebook/bart-large-cnn'
     # MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
-    
-    MODEL_PATH="t5-small"
-    DATASET_TAG = "clinical_notes_16500"
-    SAVE_DIR = get_model_save_dir(model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
+
+    # MODEL_PATH="t5-small"
+    SAVE_DIR = get_model_save_dir(model_name=MODEL_NAME, dataset_tag=DATASET_TAG)
 
     try:
-        model, tokenizer = load_model_and_tokenizer(model_path=MODEL_PATH)
+        model, tokenizer = load_model_and_tokenizer(model_path=MODEL_NAME)
     except Exception as e:
         print(f"Error occurred while loading model/tokenizer: {e}")
         return
@@ -129,7 +128,7 @@ def run_fine_tuning(file_path):
     try:
         train_dataset, val_dataset, test_dataset = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=256)
         print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
-        save_datasets(train_dataset, val_dataset, test_dataset, model_name=MODEL_PATH, dataset_tag=DATASET_TAG)
+        save_datasets(train_dataset, val_dataset, test_dataset, model_name=MODEL_NAME, dataset_tag=DATASET_TAG)
     except Exception as e:
         print(f"Error occured during tokenization: {e}")
         return
@@ -146,5 +145,4 @@ def run_fine_tuning(file_path):
 
 # Run the fine-tuning process
 if __name__ == "__main__":
-    file_path = 'data/summaries/structured_summaries_20250425_202927_checkpoint_16500.csv'  # Adjust path if necessary
-    run_fine_tuning(file_path)
+    run_fine_tuning(INPUT_FILE)

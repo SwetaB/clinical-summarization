@@ -5,6 +5,7 @@ from datasets import Dataset
 from transformers import (AutoTokenizer, AutoModelForSeq2SeqLM, 
                            T5Tokenizer, T5ForConditionalGeneration, 
                            BartTokenizer, BartForConditionalGeneration)
+from config import *
 
 
 def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):
@@ -29,18 +30,16 @@ def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):
 
 
 def get_model_save_dir(model_name, dataset_tag):
-    base_model_dir = "./models"
     model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_model_dir, model_folder, dataset_tag)
+    save_dir = os.path.join(BASE_MODEL_DIR, model_folder, dataset_tag)
     os.makedirs(save_dir, exist_ok=True)
     return save_dir
 
 
 def save_datasets(train_dataset, val_dataset, test_dataset, model_name, dataset_tag):
-    base_data_dir = "./data/train_test"
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
     model_folder = model_name.replace("/", "_")
-    save_dir = os.path.join(base_data_dir, model_folder, dataset_tag)
+    save_dir = os.path.join(BASE_DATA_DIR, model_folder, dataset_tag)
     os.makedirs(save_dir, exist_ok=True)
 
     train_file = os.path.join(save_dir, f"train_{timestamp}.csv")
