@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import argparse
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 import torch
@@ -55,7 +56,8 @@ def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
     return train_dataset, val_dataset, test_dataset
 
 
-def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models/clinical_summarization_checkpoints"):
+def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models/clinical_summarization_checkpoints",
+                **kwargs):
     '''
     # When using distributed training, ensure only the main process saves the model
     # trainer.is_world_process_zero() can be used if saving within the Trainer logic
@@ -63,12 +65,18 @@ def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models
     # For this example, saving after trainer.train() is fine as Trainer handles this
     '''
 
+    num_train_epochs = kwargs.get('num_train_epochs', 10)
+    per_device_batch_size = kwargs.get('per_device_batch_size', 4)
+    learning_rate = kwargs.get('learning_rate', 5e-5)
+    warmup_steps = kwargs.get('warmup_steps', 500)
+
     training_args = TrainingArguments(
         output_dir=save_dir,
-        num_train_epochs=3,
-        per_device_train_batch_size=4,    # Batch size per GPU/CPU for training. Total batch size = per_device_train_batch_size * num_gpus
-        per_device_eval_batch_size=4,    
-        warmup_steps=500,                 # number of warmup steps for learning rate scheduler
+        num_train_epochs=num_train_epochs,
+        per_device_train_batch_size=per_device_batch_size,    # Batch size per GPU/CPU for training. Total batch size = per_device_train_batch_size * num_gpus
+        per_device_eval_batch_size=per_device_batch_size,  
+        learning_rate=learning_rate,  
+        warmup_steps=warmup_steps,                 # number of warmup steps for learning rate scheduler
         weight_decay=0.01,                # strength of weight decay
         logging_dir='./logs',             # directory for storing logs
         eval_strategy="epoch",            # evaluation strategy
@@ -105,7 +113,7 @@ def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models
 
 
 # Function to run the entire process
-def run_fine_tuning(file_path):
+def run_fine_tuning(file_path, **kwargs):
    
     # load data
     df_processed = pd.read_csv(file_path)
@@ -136,7 +144,8 @@ def run_fine_tuning(file_path):
 
     # Fine-tune the model
     try:
-        trainer = train_model(train_dataset, val_dataset, tokenizer, model, save_dir=SAVE_DIR)
+        trainer = train_model(train_dataset, val_dataset, tokenizer, model, 
+                              save_dir=SAVE_DIR, **kwargs)
     except Exception as e:
         print(f"Error occured during training: {e}")
         return
@@ -146,4 +155,21 @@ def run_fine_tuning(file_path):
 
 # Run the fine-tuning process
 if __name__ == "__main__":
-    run_fine_tuning(INPUT_FILE)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_file', type=str, required=True, default=INPUT_FILE, help="Path to input training file")
+    parser.add_argument('--batch_size', type=int, default=4, help="Training batch size per device")
+    parser.add_argument('--epochs', type=int, default=3, help="Number of training epochs")
+    parser.add_argument('--learning_rate', type=float, default=5e-5, help="Learning rate")
+    parser.add_argument('--warmup_steps', type=int, default=500, help="Warmup steps for scheduler")
+    args = parser.parse_args()
+
+    # Training parameters
+    training_kwargs = {
+        "num_train_epochs": args.epochs,
+        "per_device_batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "warmup_steps": args.warmup_steps
+    }
+
+    run_fine_tuning(args.input_file, **training_kwargs)

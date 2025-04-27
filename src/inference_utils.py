@@ -14,7 +14,7 @@ def load_test_cases(full_df_path, test_csv_path):
     return test_subset
 
 
-def save_predictions(patient_ids, inputs, predictions, model_name, dataset_tag, experiment_name="experiment"):
+def save_predictions(patient_ids, inputs, predictions, model_name, dataset_tag, experiment_name="experiment", split_type='val'):
 
     # Mirror structure: model/dataset
     model_folder = model_name.replace("/", "_")
@@ -22,7 +22,7 @@ def save_predictions(patient_ids, inputs, predictions, model_name, dataset_tag, 
     os.makedirs(save_dir, exist_ok=True)
 
     # Prediction file path
-    output_csv_path = os.path.join(save_dir, f"predictions_{experiment_name}.csv")
+    output_csv_path = os.path.join(save_dir, f"{split_type}_predictions_{experiment_name}.csv")
 
     # Create dataframe
     df = pd.DataFrame({

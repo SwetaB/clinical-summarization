@@ -3,6 +3,7 @@ pandas
 numpy
 tqdm
 scikit-learn
+argparse
 
 # PubMed API
 pymed
@@ -19,6 +20,7 @@ tiktoken
 # LLM Fine-tuning & Tokenization
 transformers
 datasets
+evaluate
 accelerate
 peft  # for LoRA / QLoRA
 bitsandbytes  # for 8-bit quantization
@@ -37,3 +39,7 @@ torch  # manually choose torch version compatible with your GPU
 python-dotenv
 biopython
 lxml
+
+# metrics library
+bert-score
+rouge

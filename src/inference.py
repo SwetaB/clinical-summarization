@@ -55,8 +55,8 @@ if __name__ == "__main__":
     model, tokenizer = load_model_and_tokenizer(model_path=FINAL_MODEL_DIR)
     test_dataset = load_test_cases(INPUT_FILE, inference_file_path)
 
-    test_texts = test_dataset['case'].tolist()[1:10]
-    patient_ids=test_dataset['patient_id'].to_list()[1:10]
+    test_texts = test_dataset['case'].tolist()
+    patient_ids=test_dataset['patient_id'].to_list()
     
     # Run inference
     generated_summaries = generate_summary(model, tokenizer, test_texts, base_output_length=256)
@@ -84,4 +84,5 @@ metrics_to_save = {
 save_metrics_csv(metrics_to_save, 
                  model_name=MODEL_NAME, 
                  dataset_tag=DATASET_TAG, 
-                 experiment_name=EXPERIMENT_NAME)
+                 experiment_name=EXPERIMENT_NAME,
+                 split_type=args.split)
