@@ -21,12 +21,13 @@ def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
         all_inputs, all_chunk_ids, all_targets, all_patient_ids= [], [], [], []
 
         # using all chunks and extending targets to all chunks
-        for text, summary in zip(examples['case'], examples['structured_summary']):
+        for patient_id, text, summary in zip(examples['patient_id'], examples['case'], examples['structured_summary']):
             chunks = chunk_text(text, tokenizer, max_tokens=max_input_length)
             # all_inputs.append(chunks[0])  # Use only first chunk for now
             all_inputs.extend(chunks)
             all_chunk_ids.extend(list(range(len(chunks))))
             all_targets.extend([summary] * len(chunks))
+            all_patient_ids.extend([patient_id] * len(chunks))
 
         # Why is padding max lenght
         inputs = tokenizer(all_inputs, truncation=True, padding='max_length', max_length=max_input_length)
@@ -70,7 +71,7 @@ def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models
         warmup_steps=500,                 # number of warmup steps for learning rate scheduler
         weight_decay=0.01,                # strength of weight decay
         logging_dir='./logs',             # directory for storing logs
-        evaluation_strategy="epoch",      # evaluation strategy
+        eval_strategy="epoch",            # evaluation strategy
         save_strategy="epoch",            # save checkpoint every epoch
         save_total_limit=3,               # limit the total number of checkpoints
         load_best_model_at_end=True,      # load the best model when finished training

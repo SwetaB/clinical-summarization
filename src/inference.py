@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument('--split', type=str, choices=["train", "val", "test"], default="val", help="Data split type (default=val)")
     args = parser.parse_args()
     
-    inference_file_path = f"{TRAIN_TEST_SPLIT_DIR}/{args.input_file}"
+    inference_file_path = f"{TRAIN_TEST_SPLIT_DIR}/{args.input_filename}"
 
     model, tokenizer = load_model_and_tokenizer(model_path=FINAL_MODEL_DIR)
     test_dataset = load_test_cases(INPUT_FILE, inference_file_path)

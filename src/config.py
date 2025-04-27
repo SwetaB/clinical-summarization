@@ -9,7 +9,7 @@ BASE_OUTPUT_DIR = "./outputs"
 # Model and dataset info
 MODEL_NAME = "t5-small"
 DATASET_TAG = "clinical_notes_16500"
-EXPERIMENT_NAME="t5_small_16500_run1"
+EXPERIMENT_NAME="t5_small_16500_run2_withWeight"
 
 # Model save folder (automatically consistent)
 MODEL_FOLDER = MODEL_NAME.replace("/", "_")
