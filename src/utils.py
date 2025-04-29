@@ -5,7 +5,7 @@ from datasets import Dataset
 from transformers import (AutoTokenizer, AutoModelForSeq2SeqLM, 
                            T5Tokenizer, T5ForConditionalGeneration, 
                            BartTokenizer, BartForConditionalGeneration)
-from config import *
+from .config import *
 
 
 def load_model_and_tokenizer(model_path: str, model_type: str = "auto"):

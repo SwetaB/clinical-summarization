@@ -1,0 +1,12 @@
+# Ignore local data, secrets, and unnecessary files
+*.csv
+*.json
+*.env
+data/
+outputs/
+models/
+__pycache__/
+*.ipynb
+.DS_Store
+logs/
+checkpoints/

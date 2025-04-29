@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from evaluate import load
-from config import * 
+from .config import * 
 
 
 def load_test_cases(full_df_path, test_csv_path):

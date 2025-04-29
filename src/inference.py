@@ -5,10 +5,10 @@ import torch
 from transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from utils import load_model_and_tokenizer, get_model_save_dir
-from inference_utils import (load_test_cases, compute_rouge, compute_bertscore, 
+from .utils import load_model_and_tokenizer, get_model_save_dir
+from .inference_utils import (load_test_cases, compute_rouge, compute_bertscore, 
                              save_metrics_csv, save_predictions)
-from config import *
+from .config import *
 
 
 def generate_summary(model, tokenizer, text_or_texts, max_input_length=512, base_output_length=128, device="cpu"):
@@ -72,17 +72,17 @@ if __name__ == "__main__":
     rouge_scores = compute_rouge(generated_summaries, test_texts)
     bertscore_scores = compute_bertscore(generated_summaries, test_texts)
 
-# Merge the metrics you care about
-metrics_to_save = {
-    "rouge1": rouge_scores["rouge1"],
-    "rouge2": rouge_scores["rouge2"],
-    "rougeL": rouge_scores["rougeL"],
-    "bertscore_f1": bertscore_scores["bertscore_f1"]
-}
+    # Merge the metrics you care about
+    metrics_to_save = {
+        "rouge1": rouge_scores["rouge1"],
+        "rouge2": rouge_scores["rouge2"],
+        "rougeL": rouge_scores["rougeL"],
+        "bertscore_f1": bertscore_scores["bertscore_f1"]
+    }
 
-# Save to CSV
-save_metrics_csv(metrics_to_save, 
-                 model_name=MODEL_NAME, 
-                 dataset_tag=DATASET_TAG, 
-                 experiment_name=EXPERIMENT_NAME,
-                 split_type=args.split)
+    # Save to CSV
+    save_metrics_csv(metrics_to_save, 
+                    model_name=MODEL_NAME, 
+                    dataset_tag=DATASET_TAG, 
+                    experiment_name=EXPERIMENT_NAME,
+                    split_type=args.split)
