@@ -52,6 +52,3 @@ Python, PyTorch, Hugging Face Transformers, T5, Docker, AWS EC2, AWS ECR, Stream
 ONNX export + Triton inference server integration
 
 Hugging Face Spaces deployment (optional)
-
-
-![github.com/SwetaB/clinical-summarization](https://github.com/SwetaB/clinical-summarization)
