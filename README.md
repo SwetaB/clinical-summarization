@@ -27,8 +27,9 @@ clinical-summarization/
 ├── app/                    # Streamlit UI and config
 ├── data/                   # Processed case reports and chunked datasets
 ├── models/                 # Saved models and checkpoints
-├── Dockerfile              # Container setup
+├── infra/                  # Container setup - Dockerfile
 ├── requirements.txt        # Python dependencies
+└── parameters.json
 └── README.md
 ```
 
