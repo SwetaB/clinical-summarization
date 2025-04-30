@@ -18,6 +18,8 @@ Launch the app locally with:
 streamlit run app/streamlit_app.py
 ```
 
+<img src="outputs/streamlit_demo.png" width="600"/>
+
 
 ## **Project Structure**
 
