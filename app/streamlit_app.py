@@ -12,12 +12,12 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, T5ForConditionalG
 
 from src.inference import generate_summary
 
-FINAL_MODEL_DIR = 'models/t5-small/clinical_notes_16500/final_model'
+INFRENCE_MODEL = 'models/final_model'
 
 @st.cache_resource
 def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(FINAL_MODEL_DIR)
-    model = AutoModelForSeq2SeqLM.from_pretrained(FINAL_MODEL_DIR)
+    tokenizer = AutoTokenizer.from_pretrained(INFRENCE_MODEL)
+    model = AutoModelForSeq2SeqLM.from_pretrained(INFRENCE_MODEL)
     return tokenizer, model
 
 tokenizer, model = load_model()
