@@ -4,17 +4,13 @@ This project implements an end-to-end NLP pipeline to summarize clinical case re
 
 ## **Key Features**
 
-Fine-tuning of a T5 encoder-decoder LLM on PubMed clinical case reports
+- **Fine-tuning of a T5 encoder-decoder LLM** on PubMed clinical case reports  
+- **Structured prompt engineering** for clinically relevant summarization  
+- **ROUGE and BERTScore evaluation** for lexical and semantic quality  
+- **Streamlit-based UI** for interactive exploration and real-time summary generation  
+- **Dockerized training environment** with scalable deployment on **AWS EC2 (GPU/CPU)**  
+- **Model versioning and deployment** managed via **AWS ECR**
 
-Structured prompt engineering for clinically relevant summarization
-
-ROUGE and BERTScore evaluation for lexical and semantic quality
-
-Streamlit-based UI for interactive exploration and real-time summary generation
-
-Dockerized training environment and scalable deployment on AWS EC2 (GPU/CPU)
-
-Model versioning and deployment handled via AWS ECR
 
 ## **Launch Demo:**
 Launch the app locally with:
@@ -36,6 +32,7 @@ clinical-summarization/
 └── README.md
 ```
 
+
 ## **Evaluation**
 The model is evaluated using:
 
@@ -43,9 +40,11 @@ ROUGE-1, ROUGE-2, ROUGE-L
 
 BERTScore (F1) using contextual embeddings
 
+
 ## **Tech Stack**
 
 Python, PyTorch, Hugging Face Transformers, T5, Docker, AWS EC2, AWS ECR, Streamlit, ROUGE, BERTScore
+
 
 ## **Coming Soon**
 
