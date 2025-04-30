@@ -21,7 +21,7 @@ streamlit run app/streamlit_app.py
 ## **Demo Output:**
 
 <p align="center">
-  <img src="output/streamlit_demo.png" width="800"/>
+  <img src="outputs/streamlit_demo.png" width="600"/>
 </p>
 
 
