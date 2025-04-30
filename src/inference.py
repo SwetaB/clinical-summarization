@@ -5,8 +5,8 @@ import torch
 from transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from .utils import load_model_and_tokenizer, get_model_save_dir
-from .inference_utils import *
+from utils import load_model_and_tokenizer, get_model_save_dir
+from inference_utils import *
 from config import *
 from load_parameters import params
 
@@ -51,20 +51,14 @@ if __name__ == "__main__":
     parameter_values = params("parameters.json")
 
     parser = argparse.ArgumentParser(description="Run clinical summarization inference")
-    parser.add_argument('--input_filename', type=str,  help="Path to the input CSV file for inference")
+    parser.add_argument('--input_filename', type=str,  help="Optional: custom Hugging Face split dir (e.g., 'val')")
     parser.add_argument('--split', type=str, choices=["train", "val", "test"], default="val", help="Data split type (default=val)")
     args = parser.parse_args()
     
-    if args.input_filename == "":
-        split_file = next((test_file for test_file in os.listdir(TRAIN_TEST_SPLIT_DIR) if test_file.startswith(args.split)), None)
-        assert split_file, f"No file found for split '{args.split}' in {TRAIN_TEST_SPLIT_DIR}"
-        inference_file_path = os.path.join(TRAIN_TEST_SPLIT_DIR/split_file)
-    else:
-        inference_file_path = f"{TRAIN_TEST_SPLIT_DIR}/{args.input_filename}"
-
+    split_name = args.input_filename if args.input_filename else args.split
+    inference_dataset = load_test_dataset(parameter_values['input_file'], TRAIN_TEST_SPLIT_DIR, split_name)
     model, tokenizer = load_model_and_tokenizer(model_path=FINAL_MODEL_DIR)
-    test_dataset = load_test_cases(parameter_values['input_file'], inference_file_path)
 
-    run_inference(model, tokenizer, test_dataset)
+    run_inference(model, tokenizer, inference_dataset)
     
     

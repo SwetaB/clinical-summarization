@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from evaluate import load
+from datasets import load_from_disk
 from config import * 
 
 
@@ -13,6 +14,16 @@ def load_test_cases(full_df_path, test_csv_path):
     test_subset = full_df[full_df['patient_id'].isin(test_ids)].reset_index(drop=True)
     return test_subset
 
+def load_test_dataset(full_df_path, split_dir, split_name):
+    full_df = pd.read_csv(full_df_path)
+    
+    path = os.path.join(split_dir, split_name)
+    dataset = load_from_disk(path)
+    dataset.reset_format()
+    test_ids = dataset['patient_id']
+
+    test_subset = full_df[full_df['patient_id'].isin(test_ids)].reset_index(drop=True)
+    return test_subset
 
 def generate_summary(model, tokenizer, text_or_texts, max_input_length=512, base_output_length=128, device="cpu"):
     def estimate_output_length(input_text):
