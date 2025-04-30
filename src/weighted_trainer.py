@@ -20,3 +20,10 @@ class WeightedChunkTrainer(Trainer):
         weighted_loss = (loss * weights).mean()
 
         return (weighted_loss, outputs) if return_outputs else weighted_loss
+
+
+class TrainerWithTrainLoss(Trainer):
+    def _log(self, logs: dict) -> None:
+        if "loss" in logs and self.control.should_log:
+            logs["train_loss"] = logs["loss"]
+        super()._log(logs)

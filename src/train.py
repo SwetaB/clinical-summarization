@@ -7,9 +7,10 @@ import torch
 
 from transformers import Trainer, TrainingArguments, DataCollatorForSeq2Seq
 from datasets import Dataset
-from .weighted_trainer import WeightedChunkTrainer
-from .utils import load_model_and_tokenizer, get_model_save_dir, save_datasets, chunk_text
-from .config import *
+from weighted_trainer import WeightedChunkTrainer, TrainerWithTrainLoss
+from utils import *
+from config import *
+from load_parameters import params
 
 def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
     dataset = Dataset.from_pandas(df[['patient_id', 'case', 'structured_summary']])
@@ -42,14 +43,7 @@ def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
     
     dataset.set_format(type='torch', columns=['patient_id','input_ids', 'attention_mask', 'labels', 'chunk_id'])
 
-    # Split into train, val, test
-    train_val_split = dataset.train_test_split(test_size=0.3, seed=42)
-    train_dataset = train_val_split['train']
-    val_test_split = train_val_split['test'].train_test_split(test_size=0.5, seed=42)
-    val_dataset = val_test_split['train']
-    test_dataset = val_test_split['test']
-
-    return train_dataset, val_dataset, test_dataset
+    return dataset
 
 
 def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models/clinical_summarization_checkpoints",
@@ -81,14 +75,15 @@ def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models
         load_best_model_at_end=True,       # load the best model when finished training
         metric_for_best_model="eval_loss", # Metric to monitor for best model
         greater_is_better=False,           # For loss, lower is better
-        logging_steps=100, 
-        report_to="none"                   # Disable reporting to external services like W&B
+        logging_strategy="epoch",
+        logging_first_step=True,
+        report_to="none"              
     )
 
     # Use the data collator for dynamic padding
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
-    trainer = Trainer(
+    trainer = TrainerWithTrainLoss(
         model=model,                         
         args=training_args,                  
         train_dataset=train_dataset,         
@@ -100,15 +95,15 @@ def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models
     print("Starting model training...")
     trainer.train()
 
-    print("Saving model training metrics")
-    training_metrics = trainer.state.log_history
-    pd.DataFrame(training_metrics).to_csv(os.path.join(save_dir, "training_metrics.csv"), index=False)
-
     final_save_dir = os.path.join(save_dir, "final_model")
     os.makedirs(final_save_dir, exist_ok=True)
     trainer.save_model(final_save_dir)
     tokenizer.save_pretrained(final_save_dir)
     print(f"Model saved to {final_save_dir}")
+
+    print("Saving model training metrics")
+    training_metrics = trainer.state.log_history
+    pd.DataFrame(training_metrics).to_csv(os.path.join(save_dir, "training_metrics.csv"), index=False)
 
     return trainer
 
@@ -119,13 +114,15 @@ def run_fine_tuning(file_path, **kwargs):
     # load data
     df_processed = pd.read_csv(file_path)
     
-    # Load the tokenizer, model
-    # MODEL_PATH = 'Falconsai/medical_summarization'
-    # MODEL_PATH = 'facebook/bart-large-cnn'
-    # MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
-
-    # MODEL_PATH="t5-small"
-    SAVE_DIR = get_model_save_dir(model_name=MODEL_NAME, dataset_tag=DATASET_TAG)
+    # Check if train, test, data exists
+    if os.path.exists(TRAIN_TEST_SPLIT_DIR):
+        expected_dirs = [
+            os.path.join(TRAIN_TEST_SPLIT_DIR, d)
+            for d in os.listdir(TRAIN_TEST_SPLIT_DIR)
+            if d in ("train", "val", "test") and os.path.isdir(os.path.join(TRAIN_TEST_SPLIT_DIR, d))
+        ]
+    else:
+        expected_dirs = []
 
     try:
         model, tokenizer = load_model_and_tokenizer(model_path=MODEL_NAME)
@@ -136,9 +133,16 @@ def run_fine_tuning(file_path, **kwargs):
     # Tokenize the data
     print("Starting data tokenization...")
     try:
-        train_dataset, val_dataset, test_dataset = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=256)
+        if len(expected_dirs) == 3:
+            train_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "train"))
+            val_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "val"))
+            test_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "test"))
+        else:
+            tokenized_data = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=256)
+            train_dataset, val_dataset, test_dataset = split_train_test(tokenized_data)
+            save_datasets(train_dataset, val_dataset, test_dataset, model_name=MODEL_NAME, dataset_tag=DATASET_TAG)
+
         print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
-        save_datasets(train_dataset, val_dataset, test_dataset, model_name=MODEL_NAME, dataset_tag=DATASET_TAG)
     except Exception as e:
         print(f"Error occured during tokenization: {e}")
         return
@@ -146,24 +150,27 @@ def run_fine_tuning(file_path, **kwargs):
     # Fine-tune the model
     try:
         trainer = train_model(train_dataset, val_dataset, tokenizer, model, 
-                              save_dir=SAVE_DIR, **kwargs)
+                              save_dir=MODEL_OUTPUT_DIR, **kwargs)
     except Exception as e:
         print(f"Error occured during training: {e}")
         return
     
-    print(f"Fine-tuning complete. Model saved at: {SAVE_DIR}/final_model")
+    print(f"Fine-tuning complete. Model saved at: {MODEL_OUTPUT_DIR}/final_model")
 
 
 # Run the fine-tuning process
 if __name__ == "__main__":
 
+    parameter_values = params("parameters.json")
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_file', type=str, required=True, default=INPUT_FILE, help="Path to input training file")
-    parser.add_argument('--batch_size', type=int, default=4, help="Training batch size per device")
-    parser.add_argument('--epochs', type=int, default=3, help="Number of training epochs")
-    parser.add_argument('--learning_rate', type=float, default=5e-5, help="Learning rate")
-    parser.add_argument('--warmup_steps', type=int, default=500, help="Warmup steps for scheduler")
+    parser.add_argument('--input_file', type=str, default=parameter_values['input_file'], help="Path to input training file")
+    parser.add_argument('--batch_size', type=int, default=parameter_values['batch_size'], help="Training batch size per device")
+    parser.add_argument('--epochs', type=int, default=parameter_values['epochs'], help="Number of training epochs")
+    parser.add_argument('--learning_rate', type=float, default=parameter_values['learning_rate'], help="Learning rate")
+    parser.add_argument('--warmup_steps', type=int, default=parameter_values['warmup_steps'], help="Warmup steps for scheduler")
     args = parser.parse_args()
+
 
     # Training parameters
     training_kwargs = {

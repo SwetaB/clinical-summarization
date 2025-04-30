@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from evaluate import load
-from .config import * 
+from config import * 
 
 
 def load_test_cases(full_df_path, test_csv_path):
@@ -13,6 +13,37 @@ def load_test_cases(full_df_path, test_csv_path):
     test_subset = full_df[full_df['patient_id'].isin(test_ids)].reset_index(drop=True)
     return test_subset
 
+
+def generate_summary(model, tokenizer, text_or_texts, max_input_length=512, base_output_length=128, device="cpu"):
+    def estimate_output_length(input_text):
+        token_count = len(tokenizer.encode(input_text, truncation=False))
+        if token_count > 700:
+            return 512
+        elif token_count > 400:
+            return 256
+        else:
+            return base_output_length
+
+    if isinstance(text_or_texts, list):
+        output_lengths = [estimate_output_length(t) for t in text_or_texts]
+        inputs = tokenizer(text_or_texts, return_tensors="pt", padding=True, truncation=True, max_length=max_input_length).to(device)
+        with torch.no_grad():
+            outputs = []
+            for idx, input_ids in enumerate(inputs["input_ids"]):
+                input_batch = {
+                    "input_ids": input_ids.unsqueeze(0),
+                    "attention_mask": inputs["attention_mask"][idx].unsqueeze(0)
+                }
+                generated = model.generate(**input_batch, max_length=output_lengths[idx])
+                outputs.append(tokenizer.decode(generated[0], skip_special_tokens=True))
+        return outputs
+    else:
+        output_len = estimate_output_length(text_or_texts)
+        inputs = tokenizer(text_or_texts, return_tensors="pt", truncation=True, max_length=max_input_length).to(device)
+        with torch.no_grad():
+            outputs = model.generate(**inputs, max_length=output_len)
+        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
 
 def save_predictions(patient_ids, inputs, predictions, model_name, dataset_tag, experiment_name="experiment", split_type='val'):
 

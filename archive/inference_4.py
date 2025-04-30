@@ -1,3 +1,10 @@
+# Models to considered
+# # MODEL_PATH = 'Falconsai/medical_summarization'
+# MODEL_PATH = 'facebook/bart-large-cnn'
+# MODEL_PATH = "sshleifer/distilbart-cnn-12-6"
+# MODEL_PATH="t5-small"
+
+
 # from transformers import EncoderDecoderModel, AutoTokenizer
 # import torch
 
