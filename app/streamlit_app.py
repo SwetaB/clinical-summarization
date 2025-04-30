@@ -44,7 +44,7 @@ if st.session_state.active_tab == "single":
     if st.button("Summarize", key="summarize_single") and user_input.strip():
         with st.spinner("Generating summary..."):
             summary = generate_summary(model, tokenizer, user_input, base_output_length=max_tokens)
-        st.markdown("### 📄 Summary:")
+        st.markdown("### Summary:")
         st.success(summary)
 # ---- Batch NOTES OPTION ----
 elif st.session_state.active_tab == "batch":
@@ -73,6 +73,6 @@ elif st.session_state.active_tab == "batch":
                 st.success(f"Summarized top {num_rows} rows.")
 
                 csv_download = df.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Download Results as CSV", data=csv_download, file_name="summarized_notes.csv", mime="text/csv")
+                st.download_button("Download Results as CSV", data=csv_download, file_name="summarized_notes.csv", mime="text/csv")
 
 
