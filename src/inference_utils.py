@@ -16,7 +16,7 @@ def load_test_cases(full_df_path, test_csv_path):
 
 def load_test_dataset(full_df_path, split_dir, split_name):
     full_df = pd.read_csv(full_df_path)
-    
+
     path = os.path.join(split_dir, split_name)
     dataset = load_from_disk(path)
     dataset.reset_format()
@@ -25,7 +25,7 @@ def load_test_dataset(full_df_path, split_dir, split_name):
     test_subset = full_df[full_df['patient_id'].isin(test_ids)].reset_index(drop=True)
     return test_subset
 
-def generate_summary(model, tokenizer, text_or_texts, max_input_length=512, base_output_length=128, device="cpu"):
+def generate_summary(model, tokenizer, text_or_texts, max_input_length=1024, base_output_length=128, device="cpu"):
     def estimate_output_length(input_text):
         token_count = len(tokenizer.encode(input_text, truncation=False))
         if token_count > 700:

@@ -77,6 +77,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+.DS_Store
 
 # IPython
 profile_default/
@@ -175,10 +176,14 @@ cython_debug/
 
 # Data files
 data
+outputs
+archive
 
 # Models files
 models
 *.pt
 *.safetensors
 models/**
+setup_ec2.sh
+src/generate_summaries_gpt.py
 
