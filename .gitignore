@@ -175,16 +175,15 @@ cython_debug/
 .pypirc
 
 # Data files
-data
-outputs
+data/*
+outputs/*
 archive
 
 # Models files
-models
+models/*
 *.pt
 *.safetensors
 models/**
-setup_ec2.sh
-src/generate_summaries_gpt.py
+# setup_ec2.sh
 
 .DS_Store
