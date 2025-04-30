@@ -2,7 +2,7 @@
 
 This project implements an end-to-end NLP pipeline to summarize clinical case reports from PubMed using fine-tuned T5-based large language models (LLMs). It includes training, evaluation, and deployment components with a lightweight Streamlit app for real-time summarization. The project mimics real-world ML workflows and MLOps practices.
 
-**Key Features**
+# **Key Features**
 
 Fine-tuning of a T5 encoder-decoder LLM on PubMed clinical case reports
 
@@ -22,10 +22,10 @@ Launch the app locally with:
 streamlit run app/streamlit_app.py
 
 
-**Project Structure**
+## **Project Structure**
 
+```text
 clinical-summarization/
-│
 ├── src/                    # Training and inference scripts
 ├── app/                    # Streamlit UI and config
 ├── data/                   # Processed case reports and chunked datasets
@@ -33,6 +33,7 @@ clinical-summarization/
 ├── Dockerfile              # Container setup
 ├── requirements.txt        # Python dependencies
 └── README.md
+
 
 **Evaluation**
 The model is evaluated using:
