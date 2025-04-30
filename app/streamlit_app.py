@@ -10,9 +10,9 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, T5ForConditionalG
 # if project_root not in sys.path:
 #     sys.path.insert(0, project_root)
 
-from src.inference import generate_summary
+from src.inference_utils import generate_summary
 
-INFRENCE_MODEL = 'models/final_model'
+INFRENCE_MODEL = 'models/t5-small/clinical_notes_30000/final_model'
 
 @st.cache_resource
 def load_model():
@@ -22,7 +22,7 @@ def load_model():
 
 tokenizer, model = load_model()
 
-st.title("🩺 Clinical Note Summarizer")
+st.title("🩺 Clinical Case Report Summarizer")
 
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "single"

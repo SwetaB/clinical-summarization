@@ -1,4 +1,4 @@
-# 🩺 **Clinical Case Report Summarization with T5**
+# 🩺 **Clinical Case Report Summarization**
 
 This project implements an end-to-end NLP pipeline to summarize clinical case reports from PubMed using fine-tuned T5-based large language models (LLMs). It includes training, evaluation, and deployment components with a lightweight Streamlit app for real-time summarization. The project mimics real-world ML workflows and MLOps practices.
 
