@@ -187,3 +187,4 @@ models/**
 setup_ec2.sh
 src/generate_summaries_gpt.py
 
+.DS_Store
