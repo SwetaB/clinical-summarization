@@ -18,8 +18,9 @@ Model versioning and deployment handled via AWS ECR
 
 ## **Launch Demo:**
 Launch the app locally with:
-
+```code
 streamlit run app/streamlit_app.py
+```
 
 
 ## **Project Structure**
