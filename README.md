@@ -1,8 +1,8 @@
-## 🩺 **Clinical Case Report Summarization with T5**
+# 🩺 **Clinical Case Report Summarization with T5**
 
 This project implements an end-to-end NLP pipeline to summarize clinical case reports from PubMed using fine-tuned T5-based large language models (LLMs). It includes training, evaluation, and deployment components with a lightweight Streamlit app for real-time summarization. The project mimics real-world ML workflows and MLOps practices.
 
-# **Key Features**
+## **Key Features**
 
 Fine-tuning of a T5 encoder-decoder LLM on PubMed clinical case reports
 
@@ -16,7 +16,7 @@ Dockerized training environment and scalable deployment on AWS EC2 (GPU/CPU)
 
 Model versioning and deployment handled via AWS ECR
 
-**Launch Demo:**
+## **Launch Demo:**
 Launch the app locally with:
 
 streamlit run app/streamlit_app.py
@@ -33,20 +33,20 @@ clinical-summarization/
 ├── Dockerfile              # Container setup
 ├── requirements.txt        # Python dependencies
 └── README.md
+```
 
-
-**Evaluation**
+## **Evaluation**
 The model is evaluated using:
 
 ROUGE-1, ROUGE-2, ROUGE-L
 
 BERTScore (F1) using contextual embeddings
 
-**Tech Stack**
+## **Tech Stack**
 
 Python, PyTorch, Hugging Face Transformers, T5, Docker, AWS EC2, AWS ECR, Streamlit, ROUGE, BERTScore
 
-**Coming Soon**
+## **Coming Soon**
 
 ONNX export + Triton inference server integration
 
