@@ -4,11 +4,10 @@ import argparse
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 import torch
-
-from transformers import Trainer, TrainingArguments, DataCollatorForSeq2Seq
 from datasets import Dataset
 from weighted_trainer import WeightedChunkTrainer, TrainerWithTrainLoss
 from model_manager import ModelManager
+from trainer_manager import TrainManager
 from utils import *
 from config import *
 from load_parameters import params
@@ -45,68 +44,6 @@ def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
     dataset.set_format(type='torch', columns=['patient_id','input_ids', 'attention_mask', 'labels', 'chunk_id'])
 
     return dataset
-
-
-def train_model(train_dataset, val_dataset, tokenizer, model, save_dir="./models/clinical_summarization_checkpoints",
-                **kwargs):
-    '''
-    # When using distributed training, ensure only the main process saves the model
-    # trainer.is_world_process_zero() can be used if saving within the Trainer logic
-    # If saving outside, a simple check might be needed depending on setup
-    # For this example, saving after trainer.train() is fine as Trainer handles this
-    '''
-
-    num_train_epochs = kwargs.get('num_train_epochs', 10)
-    per_device_batch_size = kwargs.get('per_device_batch_size', 4)
-    learning_rate = kwargs.get('learning_rate', 5e-5)
-    warmup_steps = kwargs.get('warmup_steps', 500)
-
-    training_args = TrainingArguments(
-        output_dir=save_dir,
-        num_train_epochs=num_train_epochs,
-        per_device_train_batch_size=per_device_batch_size,    # Batch size per GPU/CPU for training. Total batch size = per_device_train_batch_size * num_gpus
-        per_device_eval_batch_size=per_device_batch_size,  
-        learning_rate=learning_rate,  
-        warmup_steps=warmup_steps,         # number of warmup steps for learning rate scheduler
-        weight_decay=0.01,                 # strength of weight decay
-        logging_dir='./logs',              # directory for storing logs
-        eval_strategy="epoch",             # evaluation strategy
-        save_strategy="epoch",             # save checkpoint every epoch
-        save_total_limit=3,                # limit the total number of checkpoints
-        load_best_model_at_end=True,       # load the best model when finished training
-        metric_for_best_model="eval_loss", # Metric to monitor for best model
-        greater_is_better=False,           # For loss, lower is better
-        logging_strategy="epoch",
-        logging_first_step=True,
-        report_to="none"              
-    )
-
-    # Use the data collator for dynamic padding
-    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
-
-    trainer = TrainerWithTrainLoss(
-        model=model,                         
-        args=training_args,                  
-        train_dataset=train_dataset,         
-        eval_dataset=val_dataset,            
-        tokenizer=tokenizer,                 
-        data_collator=data_collator          
-    )
-
-    print("Starting model training...")
-    trainer.train()
-
-    final_save_dir = os.path.join(save_dir, "final_model")
-    os.makedirs(final_save_dir, exist_ok=True)
-    trainer.save_model(final_save_dir)
-    tokenizer.save_pretrained(final_save_dir)
-    print(f"Model saved to {final_save_dir}")
-
-    print("Saving model training metrics")
-    training_metrics = trainer.state.log_history
-    pd.DataFrame(training_metrics).to_csv(os.path.join(save_dir, "training_metrics.csv"), index=False)
-
-    return trainer
 
 
 # Function to run the entire process
@@ -151,8 +88,9 @@ def run_fine_tuning(file_path, **kwargs):
 
     # Fine-tune the model
     try:
-        trainer = train_model(train_dataset, val_dataset, tokenizer, model, 
-                              save_dir=MODEL_OUTPUT_DIR, **kwargs)
+        trainer = TrainManager(model, tokenizer, train_dataset, val_dataset, save_dir=MODEL_OUTPUT_DIR,
+                               training_args=kwargs, trainer_class=TrainerWithTrainLoss)
+        trainer.train()
     except Exception as e:
         print(f"Error occured during training: {e}")
         return
