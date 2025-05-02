@@ -77,6 +77,7 @@ class PreprocessData():
 
         return dataset
 
+
 def save_tokenized_data(self, dataset, save_dir):
     os.makedirs(save_dir, exist_ok=True)
     dataset.save_to_disk(save_dir)

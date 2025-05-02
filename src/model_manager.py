@@ -32,3 +32,11 @@ class ModelManager:
     @property
     def get_tokenizer(self):
         return self.tokenizer
+    
+    @classmethod
+    def from_checkpoint(cls, checkpoint_dir: str, model_type: str = "auto"):
+        """
+        Alternate constructor that loads model/tokenizer from a saved checkpoint folder.
+        """
+        return cls(model_path=checkpoint_dir, model_type=model_type)
+

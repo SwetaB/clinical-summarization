@@ -1,30 +1,23 @@
 import os
 import pandas as pd
 from datasets import Dataset, load_dataset, load_from_disk
+from sklearn.model_selection import train_test_split
 
 
-class DataLoading:
+class DatasetManager():
     def __init__(self, data_path):
         self.data_path = data_path
-
+        self.load_data()
+    
     def load_data(self):
         if os.path.isfile(self.data_path):
             if self.data_path.lower().endswith('.csv'):
-                df = pd.read_csv(self.data_path)
-                self.dataset = Dataset.from_pandas(df)
-            else:
-                print("please load the file with .csv extension")
+                self.dataset = pd.read_csv('csv', data_files=self.data_path)
         elif os.path.isdir(self.data_path):
             self.dataset = load_from_disk(self.data_path)
         else:
             # maybe it's a HF dataset name
             self.dataset = load_dataset(self.data_path)
-        return self.dataset
-    
-
-    # self.dataset_summary()
-
-    # self.num_classes()
-
-    # self.save_raw_copy()
         
+
+

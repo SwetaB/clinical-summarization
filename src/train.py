@@ -4,84 +4,60 @@ import argparse
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 import torch
-from datasets import Dataset
+from datasets import load_dataset
 from weighted_trainer import WeightedChunkTrainer, TrainerWithTrainLoss
+
+from src.data.load import DataLoading
+from src.data.preprocess import PreprocessData
+from src.data.split import DataSplit
 from model_manager import ModelManager
 from trainer_manager import TrainManager
 from utils import *
 from config import *
 from load_parameters import params
 
-def tokenize_data(df, tokenizer, max_input_length=1024, max_target_length=256):
-    dataset = Dataset.from_pandas(df[['patient_id', 'case', 'structured_summary']])
 
-    def tokenize_examples(examples):
-        all_inputs, all_chunk_ids, all_targets, all_patient_ids= [], [], [], []
 
-        # using all chunks and extending targets to all chunks
-        for patient_id, text, summary in zip(examples['patient_id'], examples['case'], examples['structured_summary']):
-            chunks = chunk_text(text, tokenizer, max_tokens=max_input_length)
-            # all_inputs.append(chunks[0])  # Use only first chunk for now
-            all_inputs.extend(chunks)
-            all_chunk_ids.extend(list(range(len(chunks))))
-            all_targets.extend([summary] * len(chunks))
-            all_patient_ids.extend([patient_id] * len(chunks))
-
-        # Why is padding max lenght
-        inputs = tokenizer(all_inputs, truncation=True, padding='max_length', max_length=max_input_length)
-        labels = tokenizer(all_targets, truncation=True, padding='max_length', max_length=max_target_length)
-
-        inputs['labels'] = labels['input_ids']
-        inputs['chunk_id'] = all_chunk_ids
-        inputs['patient_id'] = all_patient_ids
-        return inputs
-
-    dataset = dataset.map(tokenize_examples, batched=True, remove_columns=['case', 'structured_summary'])
-
-    assert 'patient_id' in dataset.features, "Error: patient_id was dropped during tokenization!"
-    print("Patient IDs correctly preserved after tokenization.")
-    
-    dataset.set_format(type='torch', columns=['patient_id','input_ids', 'attention_mask', 'labels', 'chunk_id'])
-
-    return dataset
+def check_saved_splits(base_path):
+    required_dirs = ["train", "val", "test"]
+    return all(os.path.isdir(os.path.join(base_path, d)) for d in required_dirs)
 
 
 # Function to run the entire process
 def run_fine_tuning(file_path, **kwargs):
    
     # load data
-    df_processed = pd.read_csv(file_path)
-    
-    # Check if train, test, data exists
-    if os.path.exists(TRAIN_TEST_SPLIT_DIR):
-        expected_dirs = [
-            os.path.join(TRAIN_TEST_SPLIT_DIR, d)
-            for d in os.listdir(TRAIN_TEST_SPLIT_DIR)
-            if d in ("train", "val", "test") and os.path.isdir(os.path.join(TRAIN_TEST_SPLIT_DIR, d))
-        ]
-    else:
-        expected_dirs = []
+    data_loader = DataLoading(file_path)
+    dataset = data_loader.load_data()
 
+    # Load Model, Tokenizer
     try:
         model_loader = ModelManager(model_path=MODEL_NAME)
         model, tokenizer = model_loader.model, model_loader.tokenizer
     except Exception as e:
         print(f"Error occurred while loading model/tokenizer: {e}")
         return
-
-    # Tokenize the data
-    print("Starting data tokenization...")
+    
     try:
-        if len(expected_dirs) == 3:
+        if check_saved_splits(TRAIN_TEST_SPLIT_DIR):
             train_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "train"))
             val_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "val"))
-            test_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "test"))
         else:
-            tokenized_data = tokenize_data(df_processed, tokenizer, max_input_length=512, max_target_length=256)
-            train_dataset, val_dataset, test_dataset = split_train_test(tokenized_data)
-            save_datasets(train_dataset, val_dataset, test_dataset, model_name=MODEL_NAME, dataset_tag=DATASET_TAG)
+            # Tokenize the data
+            print("Splits not found. Starting Tokenizing and Splitting")
+            processor = PreprocessData(
+                    tokenizer=tokenizer, id_column="patient_id",
+                    input_column="case", output_column="structured_summary", 
+                    max_input_length=512, max_target_length=256,
+                    chunking=True)
 
-        print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
+            tokenized_data = processor.map_tokenized_data(dataset=dataset, tokenize_fn=processor.tokenize_fn,
+                                                        remove_columns=["case", "structured_summary"])
+
+            data_splitter = DataSplit(tokenized_data)
+            train_dataset, val_dataset = data_splitter.split_train_test(tokenized_data, return_test=False)
+
+            print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
     except Exception as e:
         print(f"Error occured during tokenization: {e}")
         return
