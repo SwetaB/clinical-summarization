@@ -8,6 +8,7 @@ import torch
 from transformers import Trainer, TrainingArguments, DataCollatorForSeq2Seq
 from datasets import Dataset
 from weighted_trainer import WeightedChunkTrainer, TrainerWithTrainLoss
+from model_manager import ModelManager
 from utils import *
 from config import *
 from load_parameters import params
@@ -125,7 +126,8 @@ def run_fine_tuning(file_path, **kwargs):
         expected_dirs = []
 
     try:
-        model, tokenizer = load_model_and_tokenizer(model_path=MODEL_NAME)
+        model_loader = ModelManager(model_path=MODEL_NAME)
+        model, tokenizer = model_loader.model, model_loader.tokenizer
     except Exception as e:
         print(f"Error occurred while loading model/tokenizer: {e}")
         return

@@ -5,10 +5,11 @@ import torch
 from transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from utils import load_model_and_tokenizer, get_model_save_dir
+from utils import  get_model_save_dir
 from inference_utils import *
 from config import *
 from load_parameters import params
+from model_manager import ModelManager
 
 
 def run_inference(model, tokenizer, evaluation_set):
@@ -57,7 +58,8 @@ if __name__ == "__main__":
     
     split_name = args.input_filename if args.input_filename else args.split
     inference_dataset = load_test_dataset(parameter_values['input_file'], TRAIN_TEST_SPLIT_DIR, split_name)
-    model, tokenizer = load_model_and_tokenizer(model_path=FINAL_MODEL_DIR)
+    model_loader = ModelManager(model_path=FINAL_MODEL_DIR)
+    model, tokenizer = model_loader.model, model_loader.tokenizer
 
     run_inference(model, tokenizer, inference_dataset)
     
