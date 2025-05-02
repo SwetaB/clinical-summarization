@@ -10,7 +10,6 @@ class DataSplit:
         self.tokenized_data = tokenized_data
     
     
-
     def split_train_test(self, test_size: float = 0.3, val_size: float = 0.5, save_data: bool = True, return_test: bool = True):
         train_val_split = self.tokenized_data.train_test_split(test_size=test_size, seed=42)
         train_dataset = train_val_split['train']
