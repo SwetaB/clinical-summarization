@@ -5,7 +5,6 @@ import torch
 from transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from utils import  get_model_save_dir
 from inference_utils import *
 from config import *
 from load_parameters import params

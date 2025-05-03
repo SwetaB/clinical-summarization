@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import json
+from datetime import datetime
 from transformers import Trainer, TrainingArguments, DataCollatorForSeq2Seq
 
 class TrainManager:
@@ -66,5 +68,24 @@ class TrainManager:
         self.trainer.train()
         self._save_model()
         self._save_metrics()
+
+    def resume_training(self, checkpoint_path: str):
+        print(f"Resuming training from checkpoint: {checkpoint_path}")
+
+        # Log resumption info
+        metadata = {
+            "checkpoint_path": checkpoint_path,
+            "resume_time": datetime.now().isoformat(),
+            "model": type(self.model).__name__,
+            "train_size": len(self.train_dataset),
+            "val_size": len(self.val_dataset),
+            "output_dir": self.training_args.output_dir
+        }
+
+        log_path = os.path.join(self.save_dir, "resume_metadata.json")
+        with open(log_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        self.trainer.train(resume_from_checkpoint=checkpoint_path)
 
     
