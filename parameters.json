@@ -3,9 +3,9 @@
       "name": "t5-small"
     },
     "data": {
-      "input_file": "./data/summaries/structured_summaries_20250425_202927_checkpoint_500.csv",
-      "dataset_tag": "clinical_notes_500",
-      "experiment_name": "t5_small_500_run2"
+      "input_file": "./data/summaries/structured_summaries_20250425_202927_checkpoint_1000.csv",
+      "dataset_tag": "clinical_notes_1000",
+      "experiment_name": "t5_small_1000_run1"
     },
     "training": {
       "max_input_length": 1024,

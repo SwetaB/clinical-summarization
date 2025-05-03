@@ -10,8 +10,10 @@ from weighted_trainer import WeightedChunkTrainer, TrainerWithTrainLoss
 from src.data.load import DataLoading
 from src.data.preprocess import PreprocessData
 from src.data.split import DataSplit
+
 from model_manager import ModelManager
 from trainer_manager import TrainManager
+
 from utils import *
 from config import *
 from load_parameters import params
@@ -40,8 +42,9 @@ def run_fine_tuning(file_path, **kwargs):
     
     try:
         if check_saved_splits(TRAIN_TEST_SPLIT_DIR):
-            train_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "train"))
-            val_dataset = load_dataset(os.path.join(TRAIN_TEST_SPLIT_DIR, "val"))
+            print("Splits found. Loading Data..")
+            train_dataset = load_from_disk(os.path.join(TRAIN_TEST_SPLIT_DIR, "train"))
+            val_dataset = load_from_disk(os.path.join(TRAIN_TEST_SPLIT_DIR, "val"))
         else:
             # Tokenize the data
             print("Splits not found. Starting Tokenizing and Splitting")
@@ -55,7 +58,7 @@ def run_fine_tuning(file_path, **kwargs):
                                                         remove_columns=["case", "structured_summary"])
 
             data_splitter = DataSplit(tokenized_data)
-            train_dataset, val_dataset = data_splitter.split_train_test(tokenized_data, return_test=False)
+            train_dataset, val_dataset = data_splitter.split_train_test(return_test=False)
 
             print(f"Tokenization done. Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
     except Exception as e:
